@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose file
+        run: cp .env.example .env && docker compose config --quiet
+      - name: Validate realm JSON
+        run: jq empty keycloak/pulse-pass-realm.json
+      - name: Start infrastructure
+        run: ./infrastructure-start.sh
+      - name: Check realm is served
+        run: curl -f http://localhost:8180/realms/pulse-pass
+      - name: Check service account permissions and realm roles
+        run: |
+          set -euo pipefail
+          token=$(curl -sf http://localhost:8180/realms/pulse-pass/protocol/openid-connect/token \
+            -d grant_type=client_credentials \
+            -d client_id=onboarding-service \
+            -d client_secret=onboarding-service-development-secret | jq -r .access_token)
+          test -n "$token" && test "$token" != "null"
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $token" \
+            http://localhost:8180/admin/realms/pulse-pass/roles/organizer)
+          test "$status" = "200"
+          for role in buyer organizer admin; do
+            curl -sf -H "Authorization: Bearer $token" \
+              "http://localhost:8180/admin/realms/pulse-pass/roles/$role" >/dev/null
+          done
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs
+      - name: Stop infrastructure
+        if: always()
+        run: ./infrastructure-stop.sh
