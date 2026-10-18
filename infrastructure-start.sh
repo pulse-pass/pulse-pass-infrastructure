@@ -10,7 +10,18 @@ if [ ! -f .env ]; then
     cp .env.example .env
 fi
 
+./infrastructure-stop.sh
+
 docker compose up -d --wait
 
-keycloak_port=$(grep -E '^KEYCLOAK_PORT=' .env | cut -d= -f2 || true)
-echo "pulse-pass infrastructure is up (Keycloak at http://localhost:${keycloak_port:-8180})"
+port() {
+    local value
+    value=$(grep -E "^$1=" .env | cut -d= -f2 || true)
+    echo "${value:-$2}"
+}
+
+echo "pulse-pass infrastructure is up"
+echo "  Keycloak: http://localhost:$(port KEYCLOAK_PORT 8180)"
+echo "  MySQL: localhost:$(port MYSQL_PORT 3306)"
+echo "  Redis: localhost:$(port REDIS_PORT 6379)"
+echo "  Kafka: localhost:$(port KAFKA_PORT 9094)"

@@ -37,6 +37,19 @@ jobs:
             curl -sf -H "Authorization: Bearer $token" \
               "http://localhost:8180/admin/realms/pulse-pass/roles/$role" >/dev/null
           done
+      - name: Check MySQL, Redis and Kafka
+        run: |
+          set -euo pipefail
+          docker exec pulse-pass-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SELECT 1"' >/dev/null
+          test "$(docker exec pulse-pass-redis redis-cli ping)" = "PONG"
+          kafka_topics=/opt/kafka/bin/kafka-topics.sh
+          docker exec pulse-pass-kafka "$kafka_topics" --bootstrap-server localhost:9092 --create --topic ci-check
+          topics="$(docker exec pulse-pass-kafka "$kafka_topics" --bootstrap-server localhost:9092 --list)"
+          grep -qx ci-check <<<"$topics"
+          topics="$(docker exec pulse-pass-kafka "$kafka_topics" --bootstrap-server localhost:9094 --list)"
+          grep -qx ci-check <<<"$topics"
+          topics="$(docker run --rm --network pulse-pass apache/kafka:3.9.1 "$kafka_topics" --bootstrap-server pulse-pass-kafka:9092 --list)"
+          grep -qx ci-check <<<"$topics"
       - name: Show container logs on failure
         if: failure()
         run: docker compose logs
