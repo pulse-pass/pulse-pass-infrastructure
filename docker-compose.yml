@@ -14,7 +14,6 @@ services:
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
     healthcheck:
-      # The image has no curl, so the readiness probe on the management port is done over /dev/tcp and checks the HTTP status line
       test:
         - "CMD-SHELL"
         - >-

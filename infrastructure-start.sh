@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Usage: ./infrastructure-start.sh
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
