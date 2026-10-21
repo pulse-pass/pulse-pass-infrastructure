@@ -24,9 +24,17 @@ Versão 26.0.7 em modo `start-dev`, com banco embutido, importando o realm de `k
 | Endereço interno | `http://pulse-pass-keycloak:8080`, para os serviços na rede `pulse-pass` |
 | Realm | `pulse-pass` |
 
-O realm `pulse-pass` tem login por usuário (o CPF), e-mail repetido permitido, cadastro pela tela desativado e política de senha com no mínimo 8 caracteres. Os papéis `buyer`, `organizer` e `admin` existem, mas não são atribuídos por padrão. O atributo `person_key` (editável só por administradores) vai para o token na claim de mesmo nome.
+O realm `pulse-pass` tem login por usuário (o CPF), e-mail repetido permitido, cadastro pela tela desativado e política de senha com no mínimo 8 caracteres. Os papéis `buyer`, `organizer` e `admin` existem, mas não são atribuídos por padrão, exceto ao administrador de desenvolvimento (papel `admin`). O atributo `person_key` (editável só por administradores) vai para o token na claim de mesmo nome.
 
-O client `onboarding-service` é confidencial, usa client credentials e password grant, e seu service account pode criar e consultar usuários (`manage-users`, `view-users` e `view-realm`, este último para consultar os papéis do realm). O secret de desenvolvimento está versionado no realm: `onboarding-service-development-secret`. Por enquanto o mapper da claim `person_key` existe só nesse client.
+O client `onboarding-service` é confidencial, usa client credentials e password grant, e seu service account pode criar e consultar usuários (`manage-users`, `view-users` e `view-realm`, este último para consultar os papéis do realm). O secret vem da variável `ONBOARDING_SERVICE_CLIENT_SECRET` do `.env` (valor de desenvolvimento no `.env.example`: `onboarding-service-development-secret`). Por enquanto os mappers das claims `person_key` e `legal_person_key` existem só nesse client. O atributo `legal_person_key` tem a mesma regra do `person_key` (visão e edição só por administradores).
+
+O realm também traz um administrador de desenvolvimento, usado para entrar no backoffice: usuário (CPF) `52998224725` e senha em `BACKOFFICE_ADMIN_PASSWORD` no `.env` (padrão `pulsepass-admin`), com o papel `admin`, o `person_key` fixo `00000000-0000-4000-8000-000000000001` e sem `legal_person_key`. As claims do token incluem o nome, o `person_key`, o `legal_person_key` (quando o usuário tem) e `realm_access.roles`.
+
+Os tokens são assinados com um par RSA fixo (RS256), para que o gateway do backoffice valide a assinatura com a chave pública da sua configuração. A chave privada e o certificado vêm de `KEYCLOAK_RSA_PRIVATE_KEY` e `KEYCLOAK_RSA_CERTIFICATE` no `.env` (base64 do PEM sem as linhas BEGIN/END). O par do `.env.example` existe só para desenvolvimento; a chave pública correspondente está no `.env.example` do `backoffice-gateway`. O issuer dos tokens emitidos no login, que passa sempre pelo `onboarding-service`, é `http://pulse-pass-keycloak:8080/realms/pulse-pass`, o endereço pelo qual o serviço chama o Keycloak; um token obtido direto em `localhost:8180` tem outro issuer e é recusado pelo gateway.
+
+O realm não guarda segredos: o arquivo usa `${VARIÁVEL}`, que o Keycloak substitui no import pelas variáveis que o compose repassa do `.env`. Um `.env` criado antes dessas variáveis precisa ser apagado para ser recriado a partir do `.env.example`.
+
+Donos de organização cadastrados antes dessa mudança não têm o atributo `legal_person_key`; é preciso recriar o ambiente (`./infrastructure-stop.sh` e `./infrastructure-start.sh`) e cadastrá-los de novo.
 
 ## MySQL
 

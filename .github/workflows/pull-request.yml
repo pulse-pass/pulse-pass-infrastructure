@@ -27,7 +27,7 @@ jobs:
           token=$(curl -sf http://localhost:8180/realms/pulse-pass/protocol/openid-connect/token \
             -d grant_type=client_credentials \
             -d client_id=onboarding-service \
-            -d client_secret=onboarding-service-development-secret | jq -r .access_token)
+            -d client_secret="$(grep -E '^ONBOARDING_SERVICE_CLIENT_SECRET=' .env | cut -d= -f2)" | jq -r .access_token)
           test -n "$token" && test "$token" != "null"
           status=$(curl -s -o /dev/null -w '%{http_code}' \
             -H "Authorization: Bearer $token" \
