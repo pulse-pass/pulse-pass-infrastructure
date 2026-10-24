@@ -5,6 +5,8 @@
   "duplicateEmailsAllowed": true,
   "registrationAllowed": false,
   "passwordPolicy": "length(8)",
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
   "roles": {
     "realm": [
       {

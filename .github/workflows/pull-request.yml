@@ -37,6 +37,34 @@ jobs:
             curl -sf -H "Authorization: Bearer $token" \
               "http://localhost:8180/admin/realms/pulse-pass/roles/$role" >/dev/null
           done
+      - name: Check refresh token rotation
+        run: |
+          set -euo pipefail
+          token_url=http://localhost:8180/realms/pulse-pass/protocol/openid-connect/token
+          client_secret="$(grep -E '^ONBOARDING_SERVICE_CLIENT_SECRET=' .env | cut -d= -f2)"
+          admin_username="$(jq -r '.users[] | select(.realmRoles // [] | index("admin")) | .username' keycloak/pulse-pass-realm.json)"
+          admin_password="$(grep -E '^BACKOFFICE_ADMIN_PASSWORD=' .env | cut -d= -f2)"
+          request_token() {
+            curl -s -w '\n%{http_code}' "$token_url" \
+              -d client_id=onboarding-service \
+              -d client_secret="$client_secret" \
+              "$@"
+          }
+          expect_invalid_grant() {
+            response="$(request_token -d grant_type=refresh_token -d refresh_token="$1")"
+            test "$(tail -n1 <<<"$response")" = "400"
+            test "$(sed '$d' <<<"$response" | jq -r .error)" = "invalid_grant"
+          }
+          login_response="$(request_token -d grant_type=password -d username="$admin_username" -d password="$admin_password")"
+          test "$(tail -n1 <<<"$login_response")" = "200"
+          first_refresh="$(sed '$d' <<<"$login_response" | jq -r .refresh_token)"
+          test -n "$first_refresh" && test "$first_refresh" != "null"
+          refresh_response="$(request_token -d grant_type=refresh_token -d refresh_token="$first_refresh")"
+          test "$(tail -n1 <<<"$refresh_response")" = "200"
+          second_refresh="$(sed '$d' <<<"$refresh_response" | jq -r .refresh_token)"
+          test -n "$second_refresh" && test "$second_refresh" != "null"
+          expect_invalid_grant "$first_refresh"
+          expect_invalid_grant "$second_refresh"
       - name: Check MySQL, Redis and Kafka
         run: |
           set -euo pipefail
