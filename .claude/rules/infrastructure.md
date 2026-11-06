@@ -1,27 +1,43 @@
 ---
-description: Shared local infrastructure, Docker and pipeline conventions
+description: Shared local infrastructure: Docker Compose, Keycloak realm, MySQL, Redis, Kafka and scripts
 paths:
   - "docker-compose.yml"
+  - ".env.example"
   - "*.sh"
   - "keycloak/**"
-  - ".github/**"
   - "README.md"
 ---
 
-# Infrastructure and pipeline
+# Infrastructure
 
-- Polyrepo in the `pulse-pass` GitHub organization, `main` only, PRs from `feature/<ID>-<slug>`, merge commits only (squash and rebase disabled).
-- This repository holds the shared local infrastructure used by every service: Keycloak, MySQL, Redis and Kafka today; Kafka UI, Mailpit and MinIO are added only when a task needs them. Services use it only in `development` mode and start their own dependencies in `test` mode (Redis and Kafka only when the service starts using them), so the default ports (3306, 6379, 9094, 8180) must not be used by services in `test` mode.
-- Layout: `docker-compose.yml`, `.env.example`, `infrastructure-start.sh`, `infrastructure-stop.sh` and one folder per component (`keycloak/` with the realm import).
-- Every container is named `pulse-pass-<component>` and joins the external `pulse-pass` network, which is shared with the services' own composes.
-- MySQL starts empty with only root (`MYSQL_ROOT_PASSWORD`, no init scripts); each service applies its own `database.sql` (own schema and user, database per service). Kafka runs KRaft with one node and two listeners: internal `pulse-pass-kafka:9092` and external `localhost:${KAFKA_PORT:-9094}`. The external port is published on the same number in the host and in the container (`${KAFKA_PORT}:${KAFKA_PORT}`) because the listener is advertised as `localhost:${KAFKA_PORT}`.
-- The start script calls `infrastructure-stop.sh` before bringing the stack up, so every start is from scratch. It creates the `pulse-pass` network if missing and copies `.env.example` on first run; `infrastructure-stop.sh` creates the network if missing (the compose declares it external) and removes containers and volumes (`down -v`). Both scripts use `set -euo pipefail` and `cd "$(dirname "${BASH_SOURCE[0]}")"`. Never remove the network, other composes may be using it.
-- Published ports bind to loopback only (`127.0.0.1:${PORT:-default}:<container port>`); services reach each other through the Docker network by container name. Compose variables always carry `${VAR:-default}` defaults, except secrets (client secrets, passwords, key material), which use `${VAR:?}` with no default so they are never versioned in the compose.
-- The compose fixes the project name (`name: pulse-pass-infrastructure`), like every service compose.
-- Image versions are always pinned (never `latest`). Images without `curl` use a `bash` `/dev/tcp` healthcheck that checks the HTTP status line (200), never a substring of the body.
-- Keycloak runs `start-dev --import-realm` with the embedded database (the realm is imported only when the container is created); the realm `pulse-pass` is versioned in `keycloak/pulse-pass-realm.json` without secrets: client secrets, user passwords and key material are `${VARIABLE}` placeholders that Keycloak resolves on import from the container environment. The compose passes each one from `.env` as `${VARIABLE:?}` (no default, so a missing value fails fast instead of versioning the secret in the compose), and `.env.example` holds the development values (`ONBOARDING_SERVICE_CLIENT_SECRET`, `BACKOFFICE_ADMIN_PASSWORD`, `KEYCLOAK_RSA_PRIVATE_KEY`, `KEYCLOAK_RSA_CERTIFICATE`). The CI copies `.env.example` to `.env` and loads it into `$GITHUB_ENV` once (`Load environment` step), so every step reads the values as environment variables (`$ONBOARDING_SERVICE_CLIENT_SECRET`, `$BACKOFFICE_ADMIN_PASSWORD`), never a literal and never a `grep` of `.env` per step. A password is read by `curl` itself from the environment (`--variable %BACKOFFICE_ADMIN_PASSWORD --expand-data-urlencode 'password={{BACKOFFICE_ADMIN_PASSWORD}}'`, curl 8.3+), never with the variable expanded by the shell inside the form field in the workflow text (Sonar S2068 flags it as a hard-coded credential).
-- The realm declares a fixed RSA key pair (`rsa-pulse-pass`, RS256, priority 200, private key and certificate as base64 PEM bodies from `.env`) next to `hmac-generated` (HS512, refresh token) and `aes-generated`. Why: the backoffice gateway validates JWTs with the public key in its configuration, so the signing key cannot be regenerated on each import. The matching public key lives in the gateway `.env.example`; it is development-only.
-- The realm rotates refresh tokens: `revokeRefreshToken` true and `refreshTokenMaxReuse` 0, so each refresh token works for a single renewal. Why: a leaked or forgotten refresh token cannot open a new session, and the backoffice serializes refreshes across tabs with Web Locks, so legitimate clients never reuse a token. Reusing an already used token returns 400 `invalid_grant` and Keycloak also terminates the session (the newer refresh token is refused too, with `Session doesn't have required client`).
-- The realm seeds a development admin (username = CPF `52998224725`, password from `BACKOFFICE_ADMIN_PASSWORD`, role `admin`, fixed `person_key`, no `legal_person_key`). `legal_person_key` is a user attribute mapped to a claim in `onboarding-service`, like `person_key`.
-- Workflows: `pull-request.yml` (name `CI`) with a single `validate` job that validates the compose and realm JSON, starts the infrastructure and checks the realm, the service account token, the realm roles and the refresh token rotation (old token refused with `invalid_grant`, session terminated after the reuse), then MySQL (`SELECT 1` with the password read inside the container), Redis (`PONG`) and Kafka (create a topic and list it through the internal listener, the external listener and from another container on the network). It has `permissions: contents: read` and a timeout. Third-party actions are pinned by full commit SHA with the version in a comment (Sonar rule S7637); `actions/*` may use tags.
-- No comments in the compose, scripts, `.env.example`, realm or workflows: names and structure must explain them, and decisions go to this file or the README. The only exception is the version next to a workflow action pinned by SHA.
+- **INF-001** This repository holds the shared local infrastructure used by every service: Keycloak, MySQL, Redis and Kafka today. Kafka UI, Mailpit and MinIO are added only when a task needs them.
+- **INF-002** Services use this infrastructure only in `development` mode and start their own dependencies in `test` mode (Redis and Kafka only when the service starts using them).
+- **INF-003** The default ports (3306, 6379, 9094, 8180) must not be used by services in `test` mode.
+- **INF-004** Layout: `docker-compose.yml`, `.env.example`, `infrastructure-start.sh`, `infrastructure-stop.sh` and one folder per component (`keycloak/` with the realm import).
+- **INF-005** Every container is named `pulse-pass-<component>` and joins the external `pulse-pass` network, shared with the services' own composes.
+- **INF-006** The compose fixes the project name (`name: pulse-pass-infrastructure`), like every service compose.
+- **INF-007** MySQL starts empty with only root (`MYSQL_ROOT_PASSWORD`, no init scripts). Each service applies its own `database.sql` (own schema and user, database per service).
+- **INF-008** Kafka runs KRaft with one node and two listeners: internal `pulse-pass-kafka:9092` and external `localhost:${KAFKA_PORT:-9094}`.
+- **INF-009** The external Kafka port is published on the same number in the host and in the container (`${KAFKA_PORT}:${KAFKA_PORT}`) because the listener is advertised as `localhost:${KAFKA_PORT}`.
+- **INF-010** `infrastructure-start.sh` calls `infrastructure-stop.sh` before bringing the stack up, so every start is from scratch.
+- **INF-011** The start script creates the `pulse-pass` network if missing and copies `.env.example` on first run.
+- **INF-012** `infrastructure-stop.sh` creates the network if missing (the compose declares it external) and removes containers and volumes (`down -v`). Never remove the network, other composes may be using it.
+- **INF-013** Both scripts use `set -euo pipefail` and `cd "$(dirname "${BASH_SOURCE[0]}")"`.
+- **INF-014** Published ports bind to loopback only (`127.0.0.1:${PORT:-default}:<container port>`).
+- **INF-015** Containers reach each other through the Docker network by container name.
+- **INF-016** Compose variables always carry `${VAR:-default}` defaults, except secrets (client secrets, passwords, key material), which use `${VAR:?}` with no default so they are never versioned in the compose.
+- **INF-017** Image versions are always pinned (never `latest`).
+- **INF-018** Images without `curl` use a `bash` `/dev/tcp` healthcheck that checks the HTTP status line (200), never a substring of the body.
+- **INF-019** Keycloak runs `start-dev --import-realm` with the embedded database; the realm is imported only when the container is created.
+- **INF-020** The realm `pulse-pass` is versioned in `keycloak/pulse-pass-realm.json` without secrets: client secrets, user passwords and key material are `${VARIABLE}` placeholders that Keycloak resolves on import from the container environment.
+- **INF-021** The compose passes each realm secret from `.env` as `${VARIABLE:?}`, so a missing value fails fast instead of versioning the secret in the compose.
+- **INF-022** `.env.example` holds the development values of the realm secrets (`ONBOARDING_SERVICE_CLIENT_SECRET`, `BACKOFFICE_ADMIN_PASSWORD`, `KEYCLOAK_RSA_PRIVATE_KEY`, `KEYCLOAK_RSA_CERTIFICATE`).
+- **INF-023** The realm declares a fixed RSA key pair (`rsa-pulse-pass`, RS256, priority 200, private key and certificate as base64 PEM bodies from `.env`) next to `hmac-generated` (HS512, refresh token) and `aes-generated`.
+- **INF-024** The RSA key is fixed because the backoffice gateway validates JWTs with the public key in its configuration, so the signing key cannot be regenerated on each import.
+- **INF-025** The matching public key lives in the gateway `.env.example`; it is development-only.
+- **INF-026** The realm rotates refresh tokens: `revokeRefreshToken` true and `refreshTokenMaxReuse` 0, so each refresh token works for a single renewal.
+- **INF-027** Rotation is on so a leaked or forgotten refresh token cannot open a new session; the backoffice serializes refreshes across tabs with Web Locks, so legitimate clients never reuse a token.
+- **INF-028** Reusing an already used refresh token returns 400 `invalid_grant` and Keycloak also terminates the session (the newer refresh token is refused too, with `Session doesn't have required client`).
+- **INF-029** The realm seeds a development admin (username = CPF `52998224725`, password from `BACKOFFICE_ADMIN_PASSWORD`, role `admin`, fixed `person_key`, no `legal_person_key`).
+- **INF-030** `legal_person_key` is a user attribute mapped to a claim in `onboarding-service`, like `person_key`.
+- **INF-031** No comments in the compose, scripts, `.env.example` or realm: names and structure must explain them, and decisions go to the rules or the README.
