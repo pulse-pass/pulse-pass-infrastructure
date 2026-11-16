@@ -38,6 +38,7 @@ paths:
 - **INF-026** The realm rotates refresh tokens: `revokeRefreshToken` true and `refreshTokenMaxReuse` 0, so each refresh token works for a single renewal.
 - **INF-027** Rotation is on so a leaked or forgotten refresh token cannot open a new session; the backoffice serializes refreshes across tabs with Web Locks, so legitimate clients never reuse a token.
 - **INF-028** Reusing an already used refresh token returns 400 `invalid_grant` and Keycloak also terminates the session (the newer refresh token is refused too, with `Session doesn't have required client`).
+- **INF-043** Access tokens last 2 minutes (`accessTokenLifespan` 120): removing an organization disables its collaborators' users and ends their sessions, and the short lifespan bounds the access left by a token issued before the removal.
 - **INF-029** The realm seeds a development admin (username = CPF `52998224725`, password from `BACKOFFICE_ADMIN_PASSWORD`, role `admin`, fixed `person_key`, no `legal_person_key`).
 - **INF-030** `legal_person_key` is a user attribute mapped to a claim in `onboarding-service`, like `person_key`.
 - **INF-031** No comments in the compose, scripts, `.env.example` or realm: names and structure must explain them, and decisions go to the rules or the README.

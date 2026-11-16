@@ -34,6 +34,8 @@ Os tokens são assinados com um par RSA fixo (RS256), para que o gateway do back
 
 Cada refresh token vale para uma única renovação: o realm liga `revokeRefreshToken` com `refreshTokenMaxReuse` em 0, então a renovação devolve um refresh token novo e o anterior deixa de valer. Reapresentar um token já usado é recusado com `invalid_grant` (o `onboarding-service` responde 401) e, além disso, o Keycloak encerra a sessão: o token novo emitido naquela renovação também passa a ser recusado com `invalid_grant`, e o usuário precisa entrar de novo. Como o realm só é importado quando o contêiner é criado, a mudança vale somente com o ambiente recriado (`./infrastructure-stop.sh` e `./infrastructure-start.sh`).
 
+O access token vale 2 minutos (`accessTokenLifespan` em 120). Quando uma organização é removida, o `onboarding-service` desativa os usuários dos colaboradores e encerra as sessões deles, e o login e o refresh passam a ser recusados. O access token que já tinha sido emitido continua válido até expirar, e o prazo curto limita esse acesso residual. A mudança também só vale com o ambiente recriado.
+
 O realm não guarda segredos: o arquivo usa `${VARIÁVEL}`, que o Keycloak substitui no import pelas variáveis que o compose repassa do `.env`. Um `.env` criado antes dessas variáveis precisa ser apagado para ser recriado a partir do `.env.example`.
 
 Donos de organização cadastrados antes dessa mudança não têm o atributo `legal_person_key`; é preciso recriar o ambiente (`./infrastructure-stop.sh` e `./infrastructure-start.sh`) e cadastrá-los de novo.
