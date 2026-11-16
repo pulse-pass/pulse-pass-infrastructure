@@ -17,3 +17,4 @@ paths:
 - **INF-040** A password is read by `curl` itself from the environment (`--variable %BACKOFFICE_ADMIN_PASSWORD --expand-data-urlencode 'password={{BACKOFFICE_ADMIN_PASSWORD}}'`, curl 8.3+), never expanded by the shell inside the form field (Sonar S2068 flags it as a hard-coded credential).
 - **INF-041** No comments in workflows: names and structure must explain them, and decisions go to the rules or the README.
 - **INF-042** PRs come from `feature/<ID>-<slug>`; merge commits only (squash and rebase disabled).
+- **INF-044** No SonarQube Cloud project and no static analysis job: the repository has no application code, and `validate` is the required check of the `main` ruleset, like the pipeline check of the other repositories.

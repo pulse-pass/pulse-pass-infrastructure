@@ -7,7 +7,7 @@ services:
     command: ["start-dev", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
       KC_HEALTH_ENABLED: "true"
       KEYCLOAK_RSA_PRIVATE_KEY: ${KEYCLOAK_RSA_PRIVATE_KEY:?}
       KEYCLOAK_RSA_CERTIFICATE: ${KEYCLOAK_RSA_CERTIFICATE:?}
@@ -35,7 +35,7 @@ services:
     image: mysql:8.0
     container_name: pulse-pass-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
     ports:
       - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
     healthcheck:

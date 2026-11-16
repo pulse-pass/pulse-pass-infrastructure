@@ -20,7 +20,7 @@ Versão 26.0.7 em modo `start-dev`, com banco embutido, importando o realm de `k
 | Item | Valor |
 | --- | --- |
 | Contêiner | `pulse-pass-keycloak` |
-| Console admin | http://localhost:8180 (usuário e senha em `.env`, padrão `admin` / `admin`) |
+| Console admin | http://localhost:8180 (usuário e senha em `.env`, valor de desenvolvimento no `.env.example`: `admin` / `admin`) |
 | Endereço interno | `http://pulse-pass-keycloak:8080`, para os serviços na rede `pulse-pass` |
 | Realm | `pulse-pass` |
 
@@ -42,7 +42,7 @@ Donos de organização cadastrados antes dessa mudança não têm o atributo `le
 
 ## MySQL
 
-Versão 8.0, contêiner `pulse-pass-mysql`. Sobe vazio, só com o usuário `root` (senha em `MYSQL_ROOT_PASSWORD` no `.env`, padrão `root`). Cada serviço cria o próprio schema e usuário pelo seu `database.sql`, um banco por serviço. Endereço interno: `pulse-pass-mysql:3306`.
+Versão 8.0, contêiner `pulse-pass-mysql`. Sobe vazio, só com o usuário `root` (senha em `MYSQL_ROOT_PASSWORD` no `.env`, valor de desenvolvimento no `.env.example`: `root`). Cada serviço cria o próprio schema e usuário pelo seu `database.sql`, um banco por serviço. Endereço interno: `pulse-pass-mysql:3306`.
 
 ## Redis
 
