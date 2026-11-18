@@ -20,7 +20,7 @@ port() {
 }
 
 echo "pulse-pass infrastructure is up"
-echo "  Keycloak: http://localhost:$(port KEYCLOAK_PORT 8180)"
+echo "  Keycloak: localhost:$(port KEYCLOAK_PORT 8180)"
 echo "  MySQL: localhost:$(port MYSQL_PORT 3306)"
 echo "  Redis: localhost:$(port REDIS_PORT 6379)"
 echo "  Kafka: localhost:$(port KAFKA_PORT 9094)"
